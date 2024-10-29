@@ -3,6 +3,7 @@ package org.kickmyb.server.task;
 import org.joda.time.DateTime;
 import org.kickmyb.server.account.MUser;
 import org.kickmyb.server.account.MUserRepository;
+import org.kickmyb.server.photo.MPhotoRepository;
 import org.kickmyb.transfer.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -20,6 +21,8 @@ public class ServiceTaskImpl implements ServiceTask {
     MUserRepository repoUser;
     @Autowired MTaskRepository repo;
     @Autowired MProgressEventRepository repoProgressEvent;
+    @Autowired
+    MPhotoRepository repoPhoto;
 
     private int percentage(Date start, Date current, Date end){
         if (current.after(end)) return 100;
@@ -80,7 +83,7 @@ public class ServiceTaskImpl implements ServiceTask {
 
     @Override
     public void updateProgress(long taskID, int value) {
-        MTask element = repo.findById(taskID).get();
+        MTask element = repo.findById((Long) taskID).get();
         // TODO validate value is between 0 and 100
         MProgressEvent pe= new MProgressEvent();
         pe.resultPercentage = value;
@@ -146,11 +149,23 @@ public class ServiceTaskImpl implements ServiceTask {
             if(t.photo != null) {
                 r.photoId = t.photo.id;
             } else {
-                r.photoId = 0L;
+                r.photoId = (Long) 0L;
             }
             res.add(r);
         }
         return res;
+    }
+
+    @Override
+    public void hardDelete(Long taskID, MUser user) {
+        MTask task = repo.findById(taskID).get();
+        user.tasks.remove(task);
+        repoUser.save(user);
+        if(task.photo != null){
+            repoProgressEvent.deleteAll(task.events);
+            repoPhoto.delete(task.photo);
+        }
+        repo.delete(task);
     }
 
     @Override
@@ -174,7 +189,7 @@ public class ServiceTaskImpl implements ServiceTask {
         if(element.photo != null) {
             response.photoId = element.photo.id;
         } else {
-            response.photoId = 0L;
+            response.photoId = (Long) 0L;
         }
 
         return response;
